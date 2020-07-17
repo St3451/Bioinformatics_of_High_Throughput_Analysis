@@ -1,6 +1,6 @@
-# Introduction to Data Science
+# Bioinformatics of High-Throughput Analysis
 
-This repository contains the assignments of Bioinformatics of High-Throughput Analysis course (fourth block of courses of my MSc in Bioinformatics). 
+This repository contains the assignments of BOHTA course (fourth block of courses of my MSc in Bioinformatics). 
 
 ## Assigments
 
