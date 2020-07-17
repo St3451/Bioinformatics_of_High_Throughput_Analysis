@@ -56,7 +56,8 @@ _Answer goes here_
 I started by downloading all the RefSeq transcripts of the hg19 assembly using the Table Browser program of the UCSC Genome Browser. I used the filter function of the Table Browser to download, as two separate files, the RefSeq transcripts on the forward and reverse strands. As output, I chose the BED output format. 
 
 ```{bash eval=FALSE}
-# Use the bedtools intersect function to find the number of transcript that do not overlap another transript (20% threshold)
+# Use the bedtools intersect function to find the number of transcript that do not overlap 
+# another transript (20% threshold)
 nice bedtools intersect -a refseq_hg19_forward.bed -b refseq_hg19_reverse.bed -f 0.2 -v | wc -l
 nice bedtools intersect -a refseq_hg19_reverse.bed -b refseq_hg19_forward.bed -f 0.2 -v | wc -l
 ```
@@ -77,8 +78,10 @@ tot_transcripts_forward <- 39593
 tot_transcripts_reverse <- 38217
 
 # Calculate overlapped transcripts for each strand
-transcripts_forward_overlap_reverse <- tot_transcripts_forward - transcripts_forward_NOT_overlap_reverse
-transcripts_reverse_overlap_forward <- tot_transcripts_reverse - transcripts_reverse_NOT_overlap_forward
+transcripts_forward_overlap_reverse <- 
+  tot_transcripts_forward - transcripts_forward_NOT_overlap_reverse
+transcripts_reverse_overlap_forward <- 
+  tot_transcripts_reverse - transcripts_reverse_NOT_overlap_forward
 paste("Forward transcripts overlapped:", transcripts_forward_overlap_reverse)
 paste("Reverse transcripts overlapped:", transcripts_reverse_overlap_forward)
 ```
@@ -86,19 +89,26 @@ paste("Reverse transcripts overlapped:", transcripts_reverse_overlap_forward)
 Afterwards, I used the wc Unix command to find the total number of transcripts on each strand (39593 on the forward amd 38217 on the reverse strand). Finally, I simply subtracted the number of transcripts, that do not overlap any transcript on the opposite strand, to the total number of transcript on that strand. Therefore, I obtained that the number of transcripts that overlap (at least) another transcript on the opposite strand is 3050, for the forward strand, and 3207 for the reverse strand.
 
 ```{r}
-# Calculate the percentage of overlapped transcripts using each strand as "query" (not necessary for the exercise)
-fraction_forward_overlap_reverse <- transcripts_forward_overlap_reverse / tot_transcripts_forward
-fraction_reverse_overlap_forward <- transcripts_reverse_overlap_forward / tot_transcripts_reverse
-paste("Fraction of transcript in the forward strand that averlap (at least) another transcript on the opposite strand is", 
-      round(fraction_forward_overlap_reverse, 4), "(", round(fraction_forward_overlap_reverse, 4) * 100, "% )")
-paste("Fraction of transcript in the reverse strand that averlap (at least) another transcript on the opposite strand is", 
-      round(fraction_reverse_overlap_forward, 4), "(", round(fraction_reverse_overlap_forward, 4) * 100, "% )")
+# Calculate the percentage of overlapped transcripts using each strand as "query" 
+# (not necessary for the exercise)
+fraction_forward_overlap_reverse <- 
+  transcripts_forward_overlap_reverse / tot_transcripts_forward
+fraction_reverse_overlap_forward <- 
+  transcripts_reverse_overlap_forward / tot_transcripts_reverse
+paste("Fraction of transcript in the forward strand that averlap is ", 
+      round(fraction_forward_overlap_reverse, 4), " (", round(fraction_forward_overlap_reverse, 4) 
+      * 100, " %)", sep = "")
+paste("Fraction of transcript in the reverse strand that averlap is ", 
+      round(fraction_reverse_overlap_forward, 4), " (", round(fraction_reverse_overlap_forward, 4) 
+      * 100, " %)", sep = "")
 
 # Calculate the (total) fraction of overlapped transcripts
-total_fraction_overlap <- (transcripts_forward_overlap_reverse + transcripts_reverse_overlap_forward) /
+total_fraction_overlap <- 
+  (transcripts_forward_overlap_reverse + transcripts_reverse_overlap_forward) /
                           (tot_transcripts_forward + tot_transcripts_reverse)
-paste("The total fraction of transcripts that overlap (at least) another transcript on the opposite strand is" , 
-      round(total_fraction_overlap, 4), "(", round(total_fraction_overlap, 4) * 100, "% )")
+paste("The total fraction of transcripts that overlap is " , 
+      round(total_fraction_overlap, 4), " (", round(total_fraction_overlap, 4) 
+      * 100, " %)", sep = "")
 ```
 
 In order to obtain the fraction of the overlapped transcripts (considering both strands), I summed the number of overlapped transcripts obtained above (on both strands), then I divided this number for the total number of RefSeq transcripts on both strands. The resulting fraction of transcripts that overlap another transcript on the opposite strand is 0.0804 (8.04%).
@@ -109,8 +119,10 @@ _Answer goes here_
 
 ```{bash eval=FALSE}
 # Use intersect with the -c flag to ouput the overlaps distribution using each strand as "query"
-nice bedtools intersect -a refseq_hg19_forward.bed -b refseq_hg19_reverse.bed -f 0.2 -c > forward_overlap_reverse_count.bed
-nice bedtools intersect -a refseq_hg19_reverse.bed -b refseq_hg19_forward.bed -f 0.2 -c > reverse_overlap_forward_count.bed
+nice bedtools intersect -a refseq_hg19_forward.bed -b refseq_hg19_reverse.bed -f 0.2 -c > 
+forward_overlap_reverse_count.bed
+nice bedtools intersect -a refseq_hg19_reverse.bed -b refseq_hg19_forward.bed -f 0.2 -c > 
+reverse_overlap_forward_count.bed
 ```
 
 Using each strand as "query", I used the -c flag of the intersect function to output the distribution of the overlaps number on opposite strand. Then, I loaded them into R to plot an appropriate histogram. 
@@ -228,7 +240,8 @@ cage_rrp40_antisense <- cage_rrp40_antisense[-1]
 ##### Sense strand
 
 ```{r}
-## Create merged dataset with FC for the sense strand (log2 is applied to the average FC for more resolution)
+## Create merged dataset with FC for the sense strand 
+#  (log2 is applied to the average FC for more resolution)
 
 # Convert data to long format
 cage_control_sense %>% 
@@ -238,13 +251,12 @@ cage_rrp40_sense %>%
 
 # Merge control and treatment data
 bind_cols(cage_control_sense_long, cage_rrp40_sense_long) %>% 
-  select(-Position1) %>%
   mutate(Fold_change = (TPM_RRP40 / TPM_control)) %>%
-  mutate(Position = as.numeric(gsub("pos.", "", Position))) %>% 
+  mutate(Position = as.numeric(gsub("pos.", "", Position...1))) %>% 
   mutate(Position = Position - 601) %>%
   group_by(Position) %>% 
   summarize(log2Mean_FC = log2(mean(Fold_change))) %>%
-  mutate(Strand = "Sense")-> log2mean_FC_sense
+  mutate(Strand = "Sense") -> log2mean_FC_sense
 
 head(log2mean_FC_sense)
 ```
@@ -252,7 +264,8 @@ head(log2mean_FC_sense)
 ##### Antisense strand
 
 ```{r}
-## Create merged dataset with FC for the antisense strand (log2 is applied to the average FC for more resolution)
+## Create merged dataset with FC for the antisense strand 
+#  (log2 is applied to the average FC for more resolution)
 
 # Convert data to long format
 cage_control_antisense %>% 
@@ -262,9 +275,8 @@ cage_rrp40_antisense %>%
 
 # Merge control and treatment data
 bind_cols(cage_control_antisense_long, cage_rrp40_antisense_long) %>% 
-  select(-Position1) %>%
   mutate(Fold_change = (TPM_RRP40 / TPM_control)) %>%
-  mutate(Position = as.numeric(gsub("pos.", "", Position))) %>% 
+  mutate(Position = as.numeric(gsub("pos.", "", Position...1))) %>% 
   mutate(Position = Position - 601) %>%
   group_by(Position) %>% 
   summarize(log2Mean_FC = log2(mean(Fold_change))) %>%
@@ -464,9 +476,9 @@ paste("DESeq un-corrected data:")
 summary(res)
 
 ## Repeat for differetential expression corrected data
-dds_corrected <- DESeqDataSetFromMatrix(countData = count_matrix,          # Count matrix
-                                        colData = design_matrix_corrected, # Design matrix 
-                                        design = ~ Condition)              # Column for the split
+dds_corrected <- DESeqDataSetFromMatrix(countData = count_matrix,          
+                                        colData = design_matrix_corrected, 
+                                        design = ~ Condition)              
 
 dds_corrected <- DESeq(dds_corrected)
 res_corrected <- results(dds_corrected,
@@ -565,78 +577,11 @@ res_corrected_tibble %>%
   arrange(log2FoldChange)
 ```
 
-The differential expression analysis perform the Wald test to see if the genes are differentially expressed between the two conditions. Indeed, the null hypothesis is that a gene is not differentially expressed ($log2fold = 0$). The P-value indicates how likely we can observe our result, under the assumption that the null hypothesis is true. Since we are testing a larger number of genes, we use an adjusted P-value (false discovery rate) that is corrected for multiple testing. 
+The differential expression analysis perform the Wald test to see if the genes are differentially expressed between the two conditions. Indeed, the null hypothesis is that a gene is not differentially expressed. The P-value indicates how likely we can observe our result, under the assumption that the null hypothesis is true. Since we are testing a larger number of genes, we use an adjusted P-value (false discovery rate) that is corrected for multiple testing. 
 
-I filtered the results of the differential expression analysis using an adjusted P-value threshold of 0.05 and a log2 fold change threshold of 0.25. Also, I further filtered the significant hits in order to show only the genes that are known to be related to diabetes. From the resulting tables it is possible to see that there are 18 more up regulated genes and 13 more down regulated genes, than what we would expect by chance.
+I filtered the results of the differential expression analysis using an adjusted P-value threshold of 0.05 and a log2 fold change threshold of 0.25. Also, I further filtered the significant hits in order to show only the genes that are known to be related to diabetes. From the resulting tables it is possible to see that there are 18 more up regulated genes and 13 more down regulated genes, than what we would expect by chance. 
 
-### Added later
-
-* Here I should have payed more attention to the question. What I stated is true but it wasn't what it was asked. I should have tested if the diabete related genes are more affected than the non diabete related genes.
-
-
-# So, I could have performed a paired test to check the significance of the count. For example a Fisher exact test where we test if the odds ratio between the ratio of the two variable (diabete related genes & diabete non related genes) is larger than 1.
-
-Basically I want to check if the diabete related genes are more affected (differentially expressed by the drug) than the other genes.
-
-* Contingency table 2x2 (Rows: DE & Non-DE, Cols: Diabete & Non-diabete)
-* Null: odds ratio (between the two conditions in Diabete & Non-diabete) <= 1
-* Null: Odds ratio = (DE diabete / Non-DE diabete) / (DE others / Non-DE others)) <= 1
-* Alternative: Odds ratio > 1 -> Diabeted related genes are more DE than other genes
-
-```{r}
-# Find all DE diabete genes
-DE_diabete_genes  <- res_corrected_tibble %>% 
-  filter(gene %in% known_genes$Gene, padj < 0.05, (log2FoldChange > 0.25 | log2FoldChange < 0.25))
-# Find DE diabete related genes
-DE_all_genes <- res_corrected_tibble %>% 
-  filter(padj < 0.05, (log2FoldChange > 0.25 | log2FoldChange < 0.25))
-
-# Get total number of diabete related genes
-diabete_genes_count <- length(known_genes$Gene)
-# Get total number of non diabete related genes
-other_genes_count <- length(res_corrected_tibble$gene) - diabete_genes_count
-
-# Get DE diabete related genes number
-DE_diabete_genes_count <- length(DE_diabete_genes$gene)
-# Get DE non dibete related genes number
-DE_other_genes_count <- length(DE_all_genes$gene) - DE_diabete_genes_count
-
-# Get non-DE diabete related genes number
-NON_DE_diabete_genes_count <- diabete_genes_count - DE_diabete_genes_count
-# Get non-DE non diabete related genes number
-NON_DE_non_other_genes_count <- other_genes_count - DE_other_genes_count
-
-# Generate count matrix
-count_matrix <- matrix(c(DE_diabete_genes_count, DE_other_genes_count, 
-                         NON_DE_diabete_genes_count, NON_DE_non_other_genes_count), nrow=2, byrow=TRUE,
-                      dimnames=list(c("DE", "Non-DE"), c("Diabete", "Non-Diabete")))  
-count_matrix
-
-# Perfom Fisher exact test
-fisher.test(count_matrix, alternative = "greater")
-
-
-# Odds ratio
-(31/91) / (1495/4052)
-```
-
-```{r}
-res_corrected_tibble %>% 
-  filter(padj < 0.05, log2FoldChange < 0.25 | log2FoldChange > 0.25) -> x
-dim(x)
-
-res_corrected_tibble %>% 
-  filter(padj < 0.05) -> y
-dim(y)
-```
-
-
-So the null is that the odds ratio __*(DE diabete / Non-DE diabete) / (DE others / Non-DE others)*__ <= 1, so that after treatment there is a equal or smaller ratio of __*DE/Non-DE*__ in __*dibete related genes*__ compared to __*non-diabete related genes*__.
-
-The p-value is 0.68, and the odds ratio is 0.923. So we can't reject the null hypothesis and we can't state that the drugs affect the diabete genes more than what we would expect by chance. (Actually the odds ratio is even less than 1, so the drug is even less effective to diabete related genes compared to other genes)
-
-In short:
-Test if diabete related genes are more represented in the DE genes than what we would expect by chance. So, perform (what about hypergeometric test?) a one sided Fisher exact test to test if the diabete related genes are more differentially expressed than the other genes. So test if the odds ratio between diabete DE/non-DE and non-diabete DE/non-DE is larger than 1. So, null: odds ratio <= 1$.
+*One way to correctly answer this question is to plot the log2 fold change of diabete and non diabete related genes to see if they follow a normal distribution. Then, I could have performed a 2-sample T-test to test if the mean of the distributions of the log 2 fold change between the two groups are different.*
 
 
 ## References
@@ -647,45 +592,3 @@ Test if diabete related genes are more represented in the DE genes than what we 
 [4] Exosome complex component RRP40, [UniProt](https://www.uniprot.org/uniprot/Q9NQT5).     
 [5] P. Preker et Al. PROMoter uPstream Transcripts share characteristics with mRNAs and are produced upstream of all three major types of mammalian promoters. Nucleic Acids Res. 2011; 39(16):7179–7193.  
 [6] M. Lloret-Llinares et Al. Relationships between PROMPT and gene expression. RNA Biolv. 2016; 13(1).  
-
-
-## NOTES
-
-### Question 1
-
-* Figure 1. I could have kept the mRNAs.
-
-* In the first two reference used I could have written Genbank NCBI and not only NCBI.
-
-* When I explain how it is possible to improve the analysis, I should have stated to look at mRNA (or exons) maybe? Coding region must exons but exon can also be 3' or 5' UTR.
-
-### Question 2
-
-* I assumed it was a tricky question and we were supposed to use the log2 FC instead of the FC. (Since it was explained in the lectures that log2 FC gives a better resolution power (we can better visualize the down regulation which is compressed otherwise). As a disclaimer, I can say that the interpretation and the shape of the pot do not change).
-
-### PCA
-
-* Mention that the 2 PCs captures only 50% of the variance.
-
-### Question 3.2.2
-
-* MA plot the line doesn't correspond exactly to he horizontal line but it is no so bad neither.
-* MA plot can be used to asses if the quantile normalization performed by DESeq is ok.
-* Our linear fit indicates that there is an increase in the log2 FC for larger base expression.
-* To fix the plot: I could make a box plot of base mean expression ditribution, the data that are larger or lower than 1.5 IQR could be considered outliers (the vertical line length indicates where is the smallest and the larger value that is not considered an outliers). Eventually we could combine the box plot with jitter plot on top.
-* The gray area of the linear fit is the confidence interval of the model, while the blue line rapresent how the mean FC change in relation to the base expression
-
-### Question 3.3.1 
-
-* Null hypothesis mistake: log2 fold change != 0 is the default setting. I actually used a log2 FC < 0.25 or FC > 0.25.
-* Log2 FC < or > 0.25 was part of the null. So I guess it was considered in the p-value.
-* Kennie: by chance means that they need to be significantly different from the controls, which are the rest of the genes.
-* Test to perform: Test if diabete related genes are more represented in the DE genes than what we would expect by chance. So, perform (what about hypergeometric test?) a one sided Fisher exact test to test if the diabete related genes are more differentially expressed than the other genes. So test if the odds ratio between diabete DE/non-DE and non-diabete DE/non-DE is larger than 1. So, null: odds ratio <= 1.
-
-* If I had the gene names I could have performed a GO enrichment analysis, to see the functional profile of the DE genes.
-
-* We should have plotted them (to check for normal distribution), we performed a 2-sample one side test, one sided T-test. 
-
-* Hypergenometric test, we want to check if our diabetes related genes are more significantly down/up regulated, compared to non related diabete genes in the list. 
-
-* Enrichment genes lecture 
