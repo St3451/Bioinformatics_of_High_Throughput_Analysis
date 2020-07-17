@@ -4,29 +4,27 @@ This repository contains the assignments of Bioinformatics of High-Throughput An
 
 ## Assigments
 
-### 1. Probability, statistics and hypothesis testing
-* [Assignment questions](https://github.com/St3451/Introduction_to_Data_Science/blob/master/Assigment1/assignment1.pdf)
-* [Hand-in](https://github.com/St3451/Introduction_to_Data_Science/blob/master/Assigment1/stefano.pellegrini.pdf)
-* [RMD](https://github.com/St3451/Introduction_to_Data_Science/blob/master/Assigment1/code/stefano.pellegrini.py)
+### Assigment 1 (group)
+* [Assignment questions](https://github.com/St3451/Bioinformatics_of_High_Throughput_Analysis/blob/master/assigment1/assigment1_questions.pdf)
+* [Hand-in](https://github.com/St3451/Bioinformatics_of_High_Throughput_Analysis/blob/master/assigment1/assigment1_handin.pdf)
+* [RMD](https://github.com/St3451/Bioinformatics_of_High_Throughput_Analysis/blob/master/assigment1/assigment1_code.Rmd)
 
-### 2. k-NN classification
-* [Assignment questions](https://github.com/St3451/Introduction_to_Data_Science/blob/master/Assigment2/assignment2.pdf)
-* [Hand-in](https://github.com/St3451/Introduction_to_Data_Science/blob/master/Assigment2/stefano.pellegrini.pdf)
-* [RMD](https://github.com/St3451/Introduction_to_Data_Science/blob/master/Assigment2/code/stefano.pellegrini.py)
+### Assigment 2 (group)
+* [Assignment questions](https://github.com/St3451/Bioinformatics_of_High_Throughput_Analysis/blob/master/assigment2/assigment2_questions.pdf)
+* [Hand-in](https://github.com/St3451/Bioinformatics_of_High_Throughput_Analysis/blob/master/assigment2/assigment2_handin.pdf)
+* [RMD](https://github.com/St3451/Bioinformatics_of_High_Throughput_Analysis/blob/master/assigment2/assigmnet2_code.RMD)
 
-### 3. PCA and k-means clustering
-* [Assignment questions](https://github.com/St3451/Introduction_to_Data_Science/blob/master/Assigment3/assignment3.pdf)
-* [Hand-in](https://github.com/St3451/Introduction_to_Data_Science/blob/master/Assigment3/stefano.pellegrini.pdf)
-* [Python code](https://github.com/St3451/Introduction_to_Data_Science/blob/master/Assigment3/code/stefano.pellegrini.py)
+### Assigment 3 (group)
+* [Assignment questions](https://github.com/St3451/Bioinformatics_of_High_Throughput_Analysis/blob/master/assigment3/assigment3_questions.pdf)
+* [Hand-in](https://github.com/St3451/Bioinformatics_of_High_Throughput_Analysis/blob/master/assigment3/assigment3_handin.pdf)
+* [RMD](https://github.com/St3451/Bioinformatics_of_High_Throughput_Analysis/blob/master/assigment3/assigment3_code.Rmd)
 
-### 4. Data exploration with PCA and k-means clustering II
-* [Assignment questions](https://github.com/St3451/Introduction_to_Data_Science/blob/master/Assigment4/assignment4.pdf)
-* [Hand-in](https://github.com/St3451/Introduction_to_Data_Science/blob/master/Assigment4/stefano.pellegrini.pdf)
-* [Python code 1](https://github.com/St3451/Introduction_to_Data_Science/blob/master/Assigment4/code/stefano.pellegrini.py)
-* [Python code 2](https://github.com/St3451/Introduction_to_Data_Science/blob/master/Assigment4/code/intro_data_science.py)
+### Assigment 4 (group)
+* [Assignment questions](https://github.com/St3451/Bioinformatics_of_High_Throughput_Analysis/blob/master/assigment4/assigment4_questions.pdf)
+* [Hand-in](https://github.com/St3451/Bioinformatics_of_High_Throughput_Analysis/blob/master/assigment4/assigment4_handin.pdf)
+* [RMD](https://github.com/St3451/Bioinformatics_of_High_Throughput_Analysis/blob/master/assigment4/assigment4_code.Rmd)
 
-### 5 & 6. Bayesian statistics, gradient descent, linear and logistic regression, random forest, classification and clustering after MDS
-* [Assignment questions](https://github.com/St3451/Introduction_to_Data_Science/blob/master/Assigment5_6/assignment5_6.pdf)
-* [Hand-in](https://github.com/St3451/Introduction_to_Data_Science/blob/master/Assigment5_6/stefano.pellegrini.pdf)
-* [Python code 1](https://github.com/St3451/Introduction_to_Data_Science/blob/master/Assigment5_6/code/stefano.pellegrini.py)
-* [Python code 2](https://github.com/St3451/Introduction_to_Data_Science/blob/master/Assigment5_6/code/intro_data_science5.py)
+### Final exam (individual)
+* [Assignment questions](https://github.com/St3451/Bioinformatics_of_High_Throughput_Analysis/blob/master/final_exam/final_exam_questions.pdf)
+* [Hand-in](https://github.com/St3451/Bioinformatics_of_High_Throughput_Analysis/blob/master/final_exam/final_exam_handin.pdf)
+* [RMD](https://github.com/St3451/Bioinformatics_of_High_Throughput_Analysis/blob/master/final_exam/final_exam_code.Rmd)
