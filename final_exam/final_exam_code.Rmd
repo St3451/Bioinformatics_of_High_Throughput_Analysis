@@ -1,0 +1,691 @@
+---
+title: "Individual homework BOHTA 2020"
+output:
+  pdf_document: default
+  html_document:
+    df_print: kable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+__Name:__ Stefano Pellegrini
+
+__KU id:__ MLQ211
+
+Instructions to run the RMD:
+
+* Follow the instructions in exercise 1.1 to download the files from the Genome Browser, use the bedtools intersect to generate `reverse_overlap_forward_count.bed` and `forward_overlap_reverse_count.bed` files, move the files to the same folder where the RMD file is located (or change the path in the RMD).
+* Remove the code to print the picture (Figure 1) in exercise 1.3.
+* `question2_data` and `question3_data` must be in the same folder where the RMD file is located (or change the path in the RMD).
+
+## Question 0
+Load all the libraries that you use in the rest of the analyses. 
+
+_Answer goes here_
+
+```{r message=FALSE}
+# Load libraries
+library(tidyverse)
+library(DESeq2)
+library(pheatmap)
+library(viridis)
+library(ggrepel)
+library(ggforce)
+
+# Set working directory to source file location
+setwd(".")
+```
+
+## Question 1
+### Introduction ###
+
+Antisense transcription is a current hot topic in genomics: when a certain genomic region is transcribed on both strands. In one model, the two RNAs produced may hybridize with each other since they are complementray, and then be degraded (a type of negative regulators). In another, deregulation happens becasue of RNA polymerase collisions. 
+
+We will now try to answer the question : How common is this in the human genome?
+
+Use the refseq track from the hg19 assembly. 
+
+Using R and bedtools (and possibly a text editor to add headers to bed files if needed), find out:
+
+- 1: What fraction of refseq transcripts overlap another transcript on the opposite strand, covering at least 20% of the transcript?
+
+_Answer goes here_
+
+I started by downloading all the RefSeq transcripts of the hg19 assembly using the Table Browser program of the UCSC Genome Browser. I used the filter function of the Table Browser to download, as two separate files, the RefSeq transcripts on the forward and reverse strands. As output, I chose the BED output format. 
+
+```{bash eval=FALSE}
+# Use the bedtools intersect function to find the number of transcript that do not overlap another transript (20% threshold)
+nice bedtools intersect -a refseq_hg19_forward.bed -b refseq_hg19_reverse.bed -f 0.2 -v | wc -l
+nice bedtools intersect -a refseq_hg19_reverse.bed -b refseq_hg19_forward.bed -f 0.2 -v | wc -l
+```
+
+Then, I loaded the two files in the Ricco server and I used the bedtools toolset to extract the overlapping transcripts. I first used the bedtools intersect function to find the number of transcripts, on the forward strand, that do not overlap any other transcript on the opposite strand (coverage threshold of 20%). I repeated the command for the reverse strand, and I found that the number of transcripts that do not overlaps any other transcript on the opposite strand is, 36543 for the forward strand, and 35010 for the reverse strand.
+
+```{bash eval=FALSE}
+# Find the total number of RefSeq transcripts on each strands
+wc -l refseq_h19_forward.bed
+wc -l refseq_h19_reverse.bed
+```
+
+```{r}
+# Save the results into R
+transcripts_forward_NOT_overlap_reverse <- 36543
+transcripts_reverse_NOT_overlap_forward <- 35010
+tot_transcripts_forward <- 39593
+tot_transcripts_reverse <- 38217
+
+# Calculate overlapped transcripts for each strand
+transcripts_forward_overlap_reverse <- tot_transcripts_forward - transcripts_forward_NOT_overlap_reverse
+transcripts_reverse_overlap_forward <- tot_transcripts_reverse - transcripts_reverse_NOT_overlap_forward
+paste("Forward transcripts overlapped:", transcripts_forward_overlap_reverse)
+paste("Reverse transcripts overlapped:", transcripts_reverse_overlap_forward)
+```
+
+Afterwards, I used the wc Unix command to find the total number of transcripts on each strand (39593 on the forward amd 38217 on the reverse strand). Finally, I simply subtracted the number of transcripts, that do not overlap any transcript on the opposite strand, to the total number of transcript on that strand. Therefore, I obtained that the number of transcripts that overlap (at least) another transcript on the opposite strand is 3050, for the forward strand, and 3207 for the reverse strand.
+
+```{r}
+# Calculate the percentage of overlapped transcripts using each strand as "query" (not necessary for the exercise)
+fraction_forward_overlap_reverse <- transcripts_forward_overlap_reverse / tot_transcripts_forward
+fraction_reverse_overlap_forward <- transcripts_reverse_overlap_forward / tot_transcripts_reverse
+paste("Fraction of transcript in the forward strand that averlap (at least) another transcript on the opposite strand is", 
+      round(fraction_forward_overlap_reverse, 4), "(", round(fraction_forward_overlap_reverse, 4) * 100, "% )")
+paste("Fraction of transcript in the reverse strand that averlap (at least) another transcript on the opposite strand is", 
+      round(fraction_reverse_overlap_forward, 4), "(", round(fraction_reverse_overlap_forward, 4) * 100, "% )")
+
+# Calculate the (total) fraction of overlapped transcripts
+total_fraction_overlap <- (transcripts_forward_overlap_reverse + transcripts_reverse_overlap_forward) /
+                          (tot_transcripts_forward + tot_transcripts_reverse)
+paste("The total fraction of transcripts that overlap (at least) another transcript on the opposite strand is" , 
+      round(total_fraction_overlap, 4), "(", round(total_fraction_overlap, 4) * 100, "% )")
+```
+
+In order to obtain the fraction of the overlapped transcripts (considering both strands), I summed the number of overlapped transcripts obtained above (on both strands), then I divided this number for the total number of RefSeq transcripts on both strands. The resulting fraction of transcripts that overlap another transcript on the opposite strand is 0.0804 (8.04%).
+
+- 2: What is the distribution of of overlaps on opposite strand? E.g: plot an appropriate histogram how many refseq transcripts have 1,2,3...N opposite strand overlapping transcripts?
+
+_Answer goes here_ 
+
+```{bash eval=FALSE}
+# Use intersect with the -c flag to ouput the overlaps distribution using each strand as "query"
+nice bedtools intersect -a refseq_hg19_forward.bed -b refseq_hg19_reverse.bed -f 0.2 -c > forward_overlap_reverse_count.bed
+nice bedtools intersect -a refseq_hg19_reverse.bed -b refseq_hg19_forward.bed -f 0.2 -c > reverse_overlap_forward_count.bed
+```
+
+Using each strand as "query", I used the -c flag of the intersect function to output the distribution of the overlaps number on opposite strand. Then, I loaded them into R to plot an appropriate histogram. 
+
+```{r message=FALSE, fig.width=14}
+# Read opposite strand overlaps counts for each strand
+col_names <- c(X1 = "Chr",            X2 = "chromStart", 
+               X3 = "chromEnd",       X4 = "transcript_ID",
+               X5 = "score",          X6 = "strand", 
+               X7 = "cdsStart",       X8 = "cdsEnd",
+               X9 = "itemRgb",        X10 = "exonsCount", 
+               X11 = "exonsSize",     X12 = "exonsStart",
+               X13 = "overlaps_count")
+
+forward_overlap_reverse_count <- read_tsv("forward_overlap_reverse_count.bed", 
+                                         col_names = col_names)
+
+reverse_overlap_forward_count <- read_tsv("reverse_overlap_forward_count.bed", 
+                                         col_names = col_names)
+
+# Plot overlaps distribution
+bind_rows(forward_overlap_reverse_count, reverse_overlap_forward_count) %>% 
+  filter(overlaps_count > 0) %>% 
+  ggplot(aes(x = overlaps_count, fill = strand)) + 
+  geom_histogram(binwidth = 1, color = "black") +
+    theme(legend.position = "none") + 
+  labs(title = "Distribution of transcripts that have overlaps on opposite strands",
+       color = "Strand") +
+  ylab("Count") + 
+  xlab("Overlaps on opposite strands") +
+  facet_zoom(ylim=c(0, 80), shrink = FALSE) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 20)) +  
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 20)) +
+  theme_bw()
+```
+
+- 3: What is the Refseq transcript with the largest number of overlapping transcripts on the other strand (same thresholds as above)? Show this in the genome browser, disccuss the image and suggest how we can improve the anlaysis based on this (max 200 words). 
+
+_Answer goes here_
+
+```{r}
+# Arrange by descending order, and select most overlapped transcript 
+bind_rows(forward_overlap_reverse_count, reverse_overlap_forward_count) %>%  
+  arrange(desc(overlaps_count)) %>% 
+  head(1) -> most_overlapped_transcript
+
+# Show most osverlapped transcript
+most_overlapped_transcript %>% 
+  select(Chr, chromStart, chromEnd, transcript_ID, strand, overlaps_count)
+
+# Select columns needed for the Genome Browser upload and save file
+most_overlapped_transcript %>%
+  select(Chr, chromStart, chromEnd) %>% 
+  write_tsv("most_overlapped_transcript.bed", col_names = FALSE)
+```
+
+In Figure 1, we can see the transcript NR_134588.1 (forward strand) and the 81 overlapping transcripts (reverse strand) found on the 18 chromosome. The added custom track (shown in red), with the coordinate of the most overlapped transcript obtained by the analysis, is located at the top of the picture. The corresponding RefSeq gene is the LOC105372068 gene and is shown at the bottom. In between there are 81 overlapping transcripts found on the opposite strand, they are 81 transcript variants of the CELF4 gene. They are members of the CELF/BRUNOL protein family, which is involved in pre-mRNA alternative splicing regulation [1]. NR_134588.1 transcript is a long non-coding RNA (lncRNA) [2], lncRNAs can be classified into different subtypes (Antisense and others) depending on the position and the direction of transcription in relation to other genes [3].   
+
+So, I hypothesize that NR_134588.1 is an Antisense RNA (asRNA) involved in the post-transcriptional regulation of the CELF4 transcrip variants.   
+One problem of the performed analysis is that, in our "query", we included both mRNAs that are overlapped by an asRNA on the opposite strand, and asRNAs that are overlapped by mRNAs. One way to improve it, and make it more specific, is to look for transcripts that are overlapped by an mRNA (or a coding region) on the opposite strand.
+
+![ 
+*Figure 1: Refseq transcript with the largest number of overlapping transcripts on the other strand, shown on the UCSC Genome Browser.*](genome_browser_figure.png)
+
+## Question 2
+
+Data is available in the folder `question2_data`
+
+### Introduction ###
+The RRP40 gene is part of the exosome complex, a molecular machine that degrades RNAs in the cells from the 3' end. Your collaborator has just made a CAGE experiment in cells in which RRP40 was depleted using a RRP40-specific siRNA. For comparison, he/she also made a control experiment where a random siRNA was used. The hope is to be able to identify what RNAs that are degraded by RRP40, becasue we should observe higher levels of these if RRP40 is depleted. They have an hypothesis that there may be RNAs transcription initiation close to known gene transcription start sites (TSSs) that we never observe in normal cells becasue the RNAs are eaten up fast. 
+
+The CAGE reads are already mapped to the genome and another collaborator has already made some files for you that shows where they fall around annotated TSSs. Specifically, you are given 4 files where the rows are the -600 to +400 region around ~12.000 annotated TSSs, and the columns are the positions (so, the first is position -600 etc for respective TSS). Values  are TPM-normalized CAGE counts plus a small amount of artificially added noise to avoid model overfitting, aside from the first column which is just the genomic position we are looking at, eg chr4:10000-11000+. 
+
+Because you have two experiments and two strands, you have four files in total. For example, the `Hw4_CAGE_rrp40_senseStrand` file has CAGE data on the plus strand and from the RRP40 depletion experiment. "Strand" is here always relative to the annotated TSS, which is always defined to be on the plus strand. 
+
+These files  are quite big (around 12 million data points, or 60-70 megabyte each), and your collaborators belatedly realized they could not plot these using Excel. Panic ensued. This is why they hired you: you know how to use R and your job is now to analyze the data and visualizing the results. 
+
+Specifically, they want you to:
+
+Using tidyverse, make a plot where the Y axis is average fold change (rrp40/ctrl) and X axis is position relative to TSS (-600 to +400). Calculate fold changes for each strand  so in the end, you will have a plot with two fold change 'lines', one for each strand. Interpret the results: What are we seeing and does this agree with the text-book decription of promoters and transcription start sites? ( max 100 words) 
+
+Tip: If numeric columns become characters during your tidyverse manipulations and you want them to be numeric, `as.numeric()` is a good function. 
+
+_Answer goes here_
+
+##### Data loading and inspection
+
+```{r message=FALSE, results="hide"}
+# Load data
+cage_control_sense <- read_tsv("question2_data/Hw4_CAGE_Ctrl_senseStrand.txt")
+cage_control_antisense <- read_tsv("question2_data/Hw4_CAGE_Ctrl_antisenseStrand.txt")
+cage_rrp40_sense <- read_tsv("question2_data/Hw4_CAGE_rrp40_senseStrand.txt")
+cage_rrp40_antisense <- read_tsv("question2_data/Hw4_CAGE_rrp40_antisenseStrand.txt")
+
+# Inspect data (not showed in the HTML for clarity)
+head(cage_control_sense)
+head(cage_control_antisense)
+head(cage_rrp40_sense)
+head(cage_rrp40_antisense)
+```
+
+```{r}
+dim(cage_control_sense)
+dim(cage_control_antisense)
+dim(cage_rrp40_sense)
+dim(cage_rrp40_antisense)
+
+# Remove information about chromosome
+cage_control_sense <- cage_control_sense[-1]
+cage_control_antisense <- cage_control_antisense[-1]
+cage_rrp40_sense <- cage_rrp40_sense[-1]
+cage_rrp40_antisense <- cage_rrp40_antisense[-1]
+```
+
+##### Sense strand
+
+```{r}
+## Create merged dataset with FC for the sense strand (log2 is applied to the average FC for more resolution)
+
+# Convert data to long format
+cage_control_sense %>% 
+  gather(key = "Position", value = "TPM_control") -> cage_control_sense_long
+cage_rrp40_sense %>% 
+  gather(key = "Position", value = "TPM_RRP40") -> cage_rrp40_sense_long
+
+# Merge control and treatment data
+bind_cols(cage_control_sense_long, cage_rrp40_sense_long) %>% 
+  select(-Position1) %>%
+  mutate(Fold_change = (TPM_RRP40 / TPM_control)) %>%
+  mutate(Position = as.numeric(gsub("pos.", "", Position))) %>% 
+  mutate(Position = Position - 601) %>%
+  group_by(Position) %>% 
+  summarize(log2Mean_FC = log2(mean(Fold_change))) %>%
+  mutate(Strand = "Sense")-> log2mean_FC_sense
+
+head(log2mean_FC_sense)
+```
+
+##### Antisense strand
+
+```{r}
+## Create merged dataset with FC for the antisense strand (log2 is applied to the average FC for more resolution)
+
+# Convert data to long format
+cage_control_antisense %>% 
+  gather(key = "Position", value = "TPM_control") -> cage_control_antisense_long
+cage_rrp40_antisense %>% 
+  gather(key = "Position", value = "TPM_RRP40") -> cage_rrp40_antisense_long
+
+# Merge control and treatment data
+bind_cols(cage_control_antisense_long, cage_rrp40_antisense_long) %>% 
+  select(-Position1) %>%
+  mutate(Fold_change = (TPM_RRP40 / TPM_control)) %>%
+  mutate(Position = as.numeric(gsub("pos.", "", Position))) %>% 
+  mutate(Position = Position - 601) %>%
+  group_by(Position) %>% 
+  summarize(log2Mean_FC = log2(mean(Fold_change))) %>%
+  mutate(Strand = "Antisense") -> log2mean_FC_antisense
+
+head(log2mean_FC_antisense)
+```
+
+##### Plot both sense and antisense (log2) average fold change for each position relative to TSS
+
+```{r}
+# Plot
+bind_rows(log2mean_FC_sense, log2mean_FC_antisense) %>% 
+  ggplot(aes(x=Position, y=log2Mean_FC, col=Strand)) + 
+  geom_line(size=0.7) + 
+  labs(title = "Average fold change (RRP40/ctrl) per position relative to known TSS") + 
+  ylab("Log2 average FC") + 
+  xlab("Relative position to TSS") + 
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 10)) +  
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) +
+  theme_bw() 
+```
+
+We can see that the greatest increase in transcription initiation activity occurs upstream the known TSSs, and in reverse direction respect to the transcription of the known genes. One interpretation is that we are detecting promoter-upstream transcripts (PROMPTs), and that RRP40 is involved in their degradation. In fact, the RRP40 gene, or EXOSC3, is part of the exosome complex RNA-degradation machine [4]. In the nucleus, it is involved in the degradation of non-coding transcripts, such as Antisense RNA and PROMPTs [4]. PROMPTs are transcribed in reverse orientation to most active protein coding genes [5] and are produced only upstream of their promoters, also, they are only detectable when RNA degradation factors are compromised [6].
+
+## Question 3
+
+Data is available in the folder `question3_data`
+
+### Introduction ###
+
+You have been hired by the Danish pharmaceutical giant Novo Nordisk to analyze an RNA-Seq study they have recently conducted. The study involves treatment of pancreatic islet cells with a new experimental drug for treatment of type 2 diabetes. Novo Nordisk wants to investigate how the drug affects cellular mRNA levels in general, and whether the expression of key groups of genes are affected. 
+
+As the patent for the new experimental drug is still pending, Novo Nordisk has censored the names of genes. 
+
+You have been supplied with 4 files:
+
+- `studyDesign.tsv`: File describing treatment of the 18 samples included in the study.
+- `countMatrix.tsv`: Number of RNA-Seq reads mapping to each of the genes.
+- `normalizedMatrix.tsv`: Normalized expression to each of the genes.
+- `diabetesGenes.tsv`: Collection of genes known to be involved in type 2 diabetes.
+
+#### Part 1: Exploratory Data Analysis
+
+__Question 3.1.1: Read all dataset into R, and make sure all three files have matching numbers and names of both samples and genes.__
+
+_Answer goes here_
+
+##### Data loading and inspection
+
+```{r message=FALSE}
+# Load data
+design_matrix <- read_tsv("question3_data/studyDesign.tsv")
+count_matrix <- read.table("question3_data/countMatrix.tsv")
+normalized_matrix <- read.table("question3_data/normalizedMatrix.tsv")
+known_genes <- read_tsv("question3_data/diabetesGenes.tsv")
+
+## Inspect data and check dimensions
+# Deisgn matrix
+dim(design_matrix)
+head(design_matrix)
+# Count_matrix
+dim(count_matrix)
+head(count_matrix)
+# Normalized matrix
+dim(normalized_matrix)
+head(normalized_matrix)
+
+# Check if genes names match between count and normalized matrix
+sum(rownames(count_matrix) != rownames(normalized_matrix))
+# Check if samples names match between count and normalized matrix
+sum(colnames(count_matrix) != colnames(normalized_matrix))
+# Check if the samples name of the count/normalized matrix match the design matrix
+sum(colnames(count_matrix) != design_matrix$Sample)
+```
+
+I can see that the design matrix contains 18 samples, 9 treatment and 9 control. Both counts and normalized matrixes contain 18 samples and 5669 genes. Both samples and genes names match between the three files.
+
+__Question 3.1.2:  Heat map: For heat maps,  it makes no sense to  include all genes - instead, we will only look at genes that vary substantially across the samples. Specifically, select the genes top 10% of genes based on their variance across all samples, and make a heat map of those using the pheatmap library (standard settings). Rows in the heat mpa should be genes, columns shoudl be samples. Make an annotation row that shows whether each sample is treatment or control. Comment on your plot__
+
+_Answer goes here_
+
+##### Heatmap
+
+```{r}
+# Compute the 10% of the genes number
+ten_percent <- round(dim(normalized_matrix)[1] * (10/100))
+
+# Select top 10% of the genes based on their variance
+normalized_matrix %>% 
+  mutate(Variance = apply(normalized_matrix, 1, var)) %>% 
+  arrange(desc(Variance)) %>% 
+  head(ten_percent) %>% 
+  select(-Variance) -> ten_percent_by_var
+
+# Convert design matrix to the format for the heatmap annotation
+condition_df <- data.frame("Condition" = design_matrix$Condition)
+rownames(condition_df) <- design_matrix$Sample
+
+# Generate an heatmap with an annotation row (sample condition)
+pheatmap(ten_percent_by_var, 
+         annotation_col=condition_df,
+         show_rownames = FALSE,
+         color=viridis(10),
+         main = "Heatmap of 10% most variable genes")
+```
+
+I generated an heatmap with the top 10% of the genes based on their variance. The heatmap is generated without the rows normalization, so it shows the "absolute" transcripts abundance (TPM) for each gene in each sample. The columns rapresent the samples and the rows rapresent the genes. The clusters division showed by the trees and the colors of the heatmap is performed by hierarchical clustering (Euclidean distance). 
+It is possible to see that there are two main clusters of genes. On the top of the heatmap, there is a larger gene cluster that contains genes with a lower expression and, on the bottom there is a smaller cluster with greater expressed genes. Eventually, we can further divide the two main clusters. The larger gene cluster at the top can be divided in three subclusters and the smaller cluster at the bottom can be divided in two subclusters. Also, as expected, the samples are divided in two main clusters corresponding to the two experimental conditions. An annotation row indicates which condition corresponds to each sample. In this regard we can see that there is something unexpected. In fact, a treated sample is in the control cluster, and a control sample is in the treatment one. This may be the result of a labeling error.  
+
+__Question 3.1.3: PCA: Using the normalized matrix (all genes, not the top 10% of genes as in the heat map), perform a Principal Components Analysis (PCA) on the samples and produce a PCA-plot of the two first components, where the axis labels show the amount of variance explained by each component and samples are colored by their experimental group. Find a way to label the samples, so the identity (the sample name) of each point can easily be seen (hint: look at `geom_text()` or the ggrepel package!). Note, you should center but not scale the data. Comment on your plot__
+
+_Answer goes here_
+
+##### PCA un-corrected
+
+```{r}
+# Convert the normalized matrix (from data frame to matrix) and transpose it
+normalized_matrix %>% 
+  as.matrix %>% t -> normalized_matrix_t
+
+# Center the data and erform PCA 
+pca_norm_matrix <- prcomp(normalized_matrix_t, center=TRUE)
+
+# Extract prportion of variance captured by each principal component
+percent_variance <- summary(pca_norm_matrix)$importance["Proportion of Variance",] * 100
+
+# Plot the data projected in the new dimensions defined by the two PCs
+as_tibble(pca_norm_matrix$x) %>% 
+  ggplot(aes(x = PC1, y = PC2, 
+             label = design_matrix$Sample, 
+             col = design_matrix$Condition)) + 
+  geom_point() + 
+  geom_label_repel(segment.alpha = 0.5) + 
+  labs(title = "PCA plot of gene expression treatment and control samples, uncorrected",
+       color = "Condition") +
+  xlab(label = paste("PC1", percent_variance[1], "%")) +
+  ylab(label = paste("PC2", percent_variance[2], "%")) + 
+  theme_bw()
+```
+
+I performed a PCA and I plotted the 18 samples projected in the space defined by the two principal components capturing the largest amount of variance in the data (~26% and ~12%). In the PCA plot we can see that all treated samples, except one, are located on the right side of the plot, while all control samples, except one, are located on the left side. Basically, it confirms that there is a problem in the data, as previously observed in the annotation row of the heatmap. In fact, sample 18 is a treated sample and is located in a cluster of control samples, while sample 6 is a control sample and is located in a cluster of trated samples.  
+
+Also, it seems that there is a simmetric pattern in the distributions of the samples. There are two sub-groups along the middle horizontal line, each containing 5 samples. While other 4 samples, at each side of the plot, are simmetrically distributed below and above the sub-groups.
+
+__Question 3.1.4: Based on the two previous questions, discuss (max 50 words) whether your observations indicate that there are any problems with the data - e.g. outliers, mix ups, sub-groups. If you identified problems  try to fix them (e.g. remove clear outliers if you find them, fix mix-ups, etc ). If you make a correction, make a PCA plot with your corrected data to check that the correction is doing the right thing __
+
+_Answer goes here_
+
+##### PCA corrected
+
+```{r}
+# Make a corrected copy of the design matrix 
+design_matrix_corrected <- design_matrix
+design_matrix_corrected[c(6,18),2] <- design_matrix_corrected[c(18,6),2]
+
+# PCA plot with corrected data
+as_tibble(pca_norm_matrix$x) %>% 
+  ggplot(aes(x=PC1, y=PC2, 
+             label=design_matrix_corrected$Sample, 
+             col=design_matrix_corrected$Condition)) + 
+  geom_point() + 
+  geom_label_repel(segment.alpha = 0.5) + 
+  labs(title = "PCA plot of gene expression treatment and control samples, corrected",
+       color = "Condition") + 
+  xlab(label = paste("PC1", percent_variance[1], "%")) +
+  ylab(label = paste("PC2", percent_variance[2], "%")) + 
+  theme_bw()
+```
+
+Both the heatmap's annotation row and the previous PCA plot indicated that sample 6 was erroneously labelled as control and sample 18 was erroneously labeleed as treated. So, I swapped the two conditions of the two samples and now the PCA plot doesn't seem to show any problem in the data. 
+
+#### Part 2: Differential Expression (DE)
+
+__Question 3.2.1: Use DESeq2 to obtain differentially expressed (DE) genes between the two experimental conditions. Use default parameter, except use a logFC threshold of 0.25 and an adjusted P-value threshold of 0.05. How many up-and down regulated genes are there on your corrected data compared to if you do the Deseq2 analysis on un-corrected data?__
+
+_Answer goes here_
+
+##### DESeq2
+
+```{r message=FALSE, warning=FALSE}
+# Convert the count matrix data frame to a matrix
+count_matrix %>% as.matrix() -> count_matrix
+
+## Differetential expression un-corrected data
+# Save the data as DESeqDatSet-object
+dds <- DESeqDataSetFromMatrix(countData = count_matrix,
+                              colData = design_matrix, 
+                              design = ~ Condition)    
+# Running DEseq2
+dds <- DESeq(dds)
+# Look at the results
+res <- results(dds,
+               lfcThreshold = 0.25,
+               alpha = 0.05)
+paste("DESeq un-corrected data:")
+summary(res)
+
+## Repeat for differetential expression corrected data
+dds_corrected <- DESeqDataSetFromMatrix(countData = count_matrix,          # Count matrix
+                                        colData = design_matrix_corrected, # Design matrix 
+                                        design = ~ Condition)              # Column for the split
+
+dds_corrected <- DESeq(dds_corrected)
+res_corrected <- results(dds_corrected,
+                         lfcThreshold = 0.25,
+                         alpha = 0.05)
+paste("DESeq corrected data:")
+summary(res_corrected)
+
+## Compute ratio of down and up regulated genes between corrected and uncorrected data
+Corrected_Uncorrected_UP_ratio <- 653 / 160
+Corrected_Uncorrected_UP_ratio
+Corrected_Uncorrected_DOWN_ratio <- 873 / 194
+Corrected_Uncorrected_DOWN_ratio
+```
+
+I performed a differnetial expression analysis using DESeq2 on both corrected and un-corrected data. The results are filtered using a log2 fold change threshold of 0.25 and an adjusted P-value threshold of 0.05. In the corrected data there are 653 (12%) up regulated genes and 873 (15%) down regulated genes, while in un-corrected data there are 160 (2.8%) up regulated genes and 194 (3.4%) down regulated genes. So, in the corrected data there are approximately 4.1 times more up regulate genes and 4.5 times more down regulated genes than the uncorrected data.
+
+__Question 3.2.2: From now on, we will only analyze the corrected data. Convert the output of DESeq2 (corrected data) to a tibble, and make an MA-plot using ggplot2. The MA-plot should show the overall trend using a trend line and genes should colored according to their DE status. Discuss whether the MA-plot indicates an approriate DESeq2 analysis (max 70 words discussion).__
+
+_Answer goes here_
+
+##### MA-plot
+
+```{r message=FALSE}
+# Convert the result of DESeq2 to a tibble
+res_corrected %>% as.data.frame %>% 
+                  rownames_to_column("gene") %>% 
+                  as_tibble -> res_corrected_tibble
+head(res_corrected_tibble)
+
+# MA-Plot, color the data points according to the DE status (up, down, regular, NA)
+res_corrected_tibble %>% 
+  mutate(DE = ifelse(padj < 0.05 & log2FoldChange > 0.25, "Up", 
+              ifelse(padj < 0.05 & log2FoldChange < 0.25, "Down", "Regular"))) %>%
+ggplot(aes(x=baseMean, y=log2FoldChange, col=DE)) + 
+  geom_point(size=0.8) + geom_smooth(color="purple", size=0.5) + scale_x_log10() +    
+  geom_hline(yintercept = 0, alpha = 0.5, color="red") + 
+  labs(title = "MA-plot, FDR threshold 0.05 and log2 fold change threshold 0.25",
+       color = "DE status") +
+  ylab("Log2 fold change") +
+  xlab("Base mean expression") + 
+  theme_bw()
+```
+
+The MA-plot can be used as diagnostic plot to check the results of the DESeq2 analysis. Here we can see that our data are not correctly normalized. In fact, the trend line, which indicates the actual average log2 fold change between the genes, should approximately correspond to zero and match the diagonal red line. In our case this is not true, in fact it is slightly "U-shaped" and it bends up on the right side of the plot. 
+
+__Question 3.2.3: Sort the DE statistics table that you get from DESeq2 to report the top 10 genes sorted by__ 
+
+__a) positive logFC (highest on top)__ 
+
+_Answer goes here_
+
+##### Up regulated genes
+
+```{r}
+# Filter by P-value threshold (for significantly expressed genes) and sort by descending FC
+res_corrected_tibble %>% 
+  filter(padj < 0.05) %>% 
+  arrange(desc(log2FoldChange)) %>% 
+  head(10)
+```
+
+__b) negative logFC (lowest on top)__
+
+_Answer goes here_
+
+##### Down regulated genes
+
+```{r}
+# Filter for adjusted P-value threshold and sort by ascending FC
+res_corrected_tibble %>% 
+  filter(padj < 0.05) %>% 
+  arrange(log2FoldChange) %>% 
+  head(10)
+```
+
+__only looking at significantly differentially expressed genes__
+
+#### Part 3: Is the drug any good?
+
+__Question 3.3.1: Novo Nordisk claims their treatment affects expression of genes related to diabetes. Your task is to investigate whether this is true. They have supplied you with a long list of genes that are diabetes-related - diabetesGenes.tsv. Are these genes more up/down regulated than expected by chance, by looking at log2FC values from above ?__
+
+_Answer goes here_
+
+##### Diabete related genes
+
+```{r}
+# Up regulated genes, sorted by log2 fold change
+res_corrected_tibble %>% 
+  filter(gene %in% known_genes$Gene, padj < 0.05, log2FoldChange > 0.25) %>% 
+  arrange(desc(log2FoldChange))
+
+# Down regulated genes, sorted by log2 fold change
+res_corrected_tibble %>% 
+  filter(gene %in% known_genes$Gene, padj < 0.05, log2FoldChange < 0.25) %>% 
+  arrange(log2FoldChange)
+```
+
+The differential expression analysis perform the Wald test to see if the genes are differentially expressed between the two conditions. Indeed, the null hypothesis is that a gene is not differentially expressed ($log2fold = 0$). The P-value indicates how likely we can observe our result, under the assumption that the null hypothesis is true. Since we are testing a larger number of genes, we use an adjusted P-value (false discovery rate) that is corrected for multiple testing. 
+
+I filtered the results of the differential expression analysis using an adjusted P-value threshold of 0.05 and a log2 fold change threshold of 0.25. Also, I further filtered the significant hits in order to show only the genes that are known to be related to diabetes. From the resulting tables it is possible to see that there are 18 more up regulated genes and 13 more down regulated genes, than what we would expect by chance.
+
+### Added later
+
+* Here I should have payed more attention to the question. What I stated is true but it wasn't what it was asked. I should have tested if the diabete related genes are more affected than the non diabete related genes.
+
+
+# So, I could have performed a paired test to check the significance of the count. For example a Fisher exact test where we test if the odds ratio between the ratio of the two variable (diabete related genes & diabete non related genes) is larger than 1.
+
+Basically I want to check if the diabete related genes are more affected (differentially expressed by the drug) than the other genes.
+
+* Contingency table 2x2 (Rows: DE & Non-DE, Cols: Diabete & Non-diabete)
+* Null: odds ratio (between the two conditions in Diabete & Non-diabete) <= 1
+* Null: Odds ratio = (DE diabete / Non-DE diabete) / (DE others / Non-DE others)) <= 1
+* Alternative: Odds ratio > 1 -> Diabeted related genes are more DE than other genes
+
+```{r}
+# Find all DE diabete genes
+DE_diabete_genes  <- res_corrected_tibble %>% 
+  filter(gene %in% known_genes$Gene, padj < 0.05, (log2FoldChange > 0.25 | log2FoldChange < 0.25))
+# Find DE diabete related genes
+DE_all_genes <- res_corrected_tibble %>% 
+  filter(padj < 0.05, (log2FoldChange > 0.25 | log2FoldChange < 0.25))
+
+# Get total number of diabete related genes
+diabete_genes_count <- length(known_genes$Gene)
+# Get total number of non diabete related genes
+other_genes_count <- length(res_corrected_tibble$gene) - diabete_genes_count
+
+# Get DE diabete related genes number
+DE_diabete_genes_count <- length(DE_diabete_genes$gene)
+# Get DE non dibete related genes number
+DE_other_genes_count <- length(DE_all_genes$gene) - DE_diabete_genes_count
+
+# Get non-DE diabete related genes number
+NON_DE_diabete_genes_count <- diabete_genes_count - DE_diabete_genes_count
+# Get non-DE non diabete related genes number
+NON_DE_non_other_genes_count <- other_genes_count - DE_other_genes_count
+
+# Generate count matrix
+count_matrix <- matrix(c(DE_diabete_genes_count, DE_other_genes_count, 
+                         NON_DE_diabete_genes_count, NON_DE_non_other_genes_count), nrow=2, byrow=TRUE,
+                      dimnames=list(c("DE", "Non-DE"), c("Diabete", "Non-Diabete")))  
+count_matrix
+
+# Perfom Fisher exact test
+fisher.test(count_matrix, alternative = "greater")
+
+
+# Odds ratio
+(31/91) / (1495/4052)
+```
+
+```{r}
+res_corrected_tibble %>% 
+  filter(padj < 0.05, log2FoldChange < 0.25 | log2FoldChange > 0.25) -> x
+dim(x)
+
+res_corrected_tibble %>% 
+  filter(padj < 0.05) -> y
+dim(y)
+```
+
+
+So the null is that the odds ratio __*(DE diabete / Non-DE diabete) / (DE others / Non-DE others)*__ <= 1, so that after treatment there is a equal or smaller ratio of __*DE/Non-DE*__ in __*dibete related genes*__ compared to __*non-diabete related genes*__.
+
+The p-value is 0.68, and the odds ratio is 0.923. So we can't reject the null hypothesis and we can't state that the drugs affect the diabete genes more than what we would expect by chance. (Actually the odds ratio is even less than 1, so the drug is even less effective to diabete related genes compared to other genes)
+
+In short:
+Test if diabete related genes are more represented in the DE genes than what we would expect by chance. So, perform (what about hypergeometric test?) a one sided Fisher exact test to test if the diabete related genes are more differentially expressed than the other genes. So test if the odds ratio between diabete DE/non-DE and non-diabete DE/non-DE is larger than 1. So, null: odds ratio <= 1$.
+
+
+## References
+
+[1] Homo sapiens CUGBP Elav-like family member 4 (CELF4), transcript variant 65, mRNA, [NCBI](https://www.ncbi.nlm.nih.gov/nuccore/NM_001353756.2?report=GenBank).   
+[2] Homo sapiens uncharacterized LOC105372068 (LOC105372068), long non-coding RNA, [NCBI](https://www.ncbi.nlm.nih.gov/nuccore/NR_134588.1?report=GenBank).   
+[3] Mattick JS, Rinn JL. Discovery and annotation of long noncoding RNAs. Nat Struct Mol Biol. 2015; 22(1):5‐7.  
+[4] Exosome complex component RRP40, [UniProt](https://www.uniprot.org/uniprot/Q9NQT5).     
+[5] P. Preker et Al. PROMoter uPstream Transcripts share characteristics with mRNAs and are produced upstream of all three major types of mammalian promoters. Nucleic Acids Res. 2011; 39(16):7179–7193.  
+[6] M. Lloret-Llinares et Al. Relationships between PROMPT and gene expression. RNA Biolv. 2016; 13(1).  
+
+
+## NOTES
+
+### Question 1
+
+* Figure 1. I could have kept the mRNAs.
+
+* In the first two reference used I could have written Genbank NCBI and not only NCBI.
+
+* When I explain how it is possible to improve the analysis, I should have stated to look at mRNA (or exons) maybe? Coding region must exons but exon can also be 3' or 5' UTR.
+
+### Question 2
+
+* I assumed it was a tricky question and we were supposed to use the log2 FC instead of the FC. (Since it was explained in the lectures that log2 FC gives a better resolution power (we can better visualize the down regulation which is compressed otherwise). As a disclaimer, I can say that the interpretation and the shape of the pot do not change).
+
+### PCA
+
+* Mention that the 2 PCs captures only 50% of the variance.
+
+### Question 3.2.2
+
+* MA plot the line doesn't correspond exactly to he horizontal line but it is no so bad neither.
+* MA plot can be used to asses if the quantile normalization performed by DESeq is ok.
+* Our linear fit indicates that there is an increase in the log2 FC for larger base expression.
+* To fix the plot: I could make a box plot of base mean expression ditribution, the data that are larger or lower than 1.5 IQR could be considered outliers (the vertical line length indicates where is the smallest and the larger value that is not considered an outliers). Eventually we could combine the box plot with jitter plot on top.
+* The gray area of the linear fit is the confidence interval of the model, while the blue line rapresent how the mean FC change in relation to the base expression
+
+### Question 3.3.1 
+
+* Null hypothesis mistake: log2 fold change != 0 is the default setting. I actually used a log2 FC < 0.25 or FC > 0.25.
+* Log2 FC < or > 0.25 was part of the null. So I guess it was considered in the p-value.
+* Kennie: by chance means that they need to be significantly different from the controls, which are the rest of the genes.
+* Test to perform: Test if diabete related genes are more represented in the DE genes than what we would expect by chance. So, perform (what about hypergeometric test?) a one sided Fisher exact test to test if the diabete related genes are more differentially expressed than the other genes. So test if the odds ratio between diabete DE/non-DE and non-diabete DE/non-DE is larger than 1. So, null: odds ratio <= 1.
+
+* If I had the gene names I could have performed a GO enrichment analysis, to see the functional profile of the DE genes.
+
+* We should have plotted them (to check for normal distribution), we performed a 2-sample one side test, one sided T-test. 
+
+* Hypergenometric test, we want to check if our diabetes related genes are more significantly down/up regulated, compared to non related diabete genes in the list. 
+
+* Enrichment genes lecture 

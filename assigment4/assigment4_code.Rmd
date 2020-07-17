@@ -1,0 +1,179 @@
+---
+title: "Data mining exercise"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+__Names__: Rikke Stausholm, Stefano Pellegrini  
+
+__Group__: 5 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+Your collaborator has made a  CAGE experiment using 7 different tissues. As a remainder, CAGE tags are 20-21 nt long tags mapping to the genome. We often cluster CAGE tags that are close to one another on the genome to a “tag cluster”. A tag cluster can then have several tags from one or several tissues. 
+
+One can view these CAGE tag clusters as being “core promoters” in the sense that they are measuring the activity and location of a core promoter.
+
+The data file `htbinf_cage_tpms` shows the CAGE tag clusters as rows, and tissues as columns. The cell values are the TPMs from the given tissue in the cluster.  There are three additional columns: the tag cluster ID, the location of the cluster in mm8 and the strand of the cluster. 
+The collaborator now wants to know:
+
+__1. How many types of core promoters are there in terms of tissue expression patterns, and what expression patterns are these? __
+
+```{r message=FALSE}
+library(tidyverse)
+library(pheatmap)
+library(viridis)
+
+# Load data
+cage_data <- read_tsv("htbinf_cage_tpms.txt")
+
+# Columns 
+colnames(cage_data)
+dim(cage_data)
+
+# Tissues: cerebellum, whole embrio, liver, lung, macrophages, somato sensory cortex, visual cortex
+tissues <- colnames(cage_data[,4:10])
+
+# TPM for each tissues (omits ID, location and strand)
+TPM <- cage_data[,4:10]
+```
+
+The more tags we have, the higher is the activitity of the promoter.  
+
+Seven tissues: cerebellum, whole embrio, liver, lung, blood macrophages, somatosensory cortex, visual cortex.  
+
+### Generate an heatmap with normalized rows
+
+```{r}
+# Convert to matrix to use annotation row
+cage_matrix <- cage_data %>%
+  select(-location, -strand) %>%
+  as.data.frame() %>%
+  column_to_rownames("tc_id") %>%
+  as.matrix()
+
+# Genererate heatmap, with normalizization by rows and annotation row
+annotation_df <- cage_data %>%
+  select(tc_id, strand) %>%
+  as.data.frame() %>%
+  column_to_rownames("tc_id")
+
+pheatmap(cage_matrix,
+         scale= "row",
+         show_rownames = FALSE,
+         color=viridis(10),
+         annotation_row = annotation_df, 
+         main = "Heatmap of core promoters usage by tissue, rows standardization")
+```
+
+Normalizing by rows, we can see the usage of each core promoter in the different tissues. From the heatmap hierarchical clustering, it seems that we have 4 clusters of tissues. The hierarchical clustering use the Euclidean distance to cluster both core promoters (rows) and tissues (columns) and build the trees. The information about the strand doesn't seem to be important.
+
+### Divide the tissues in 4 clusters
+
+```{r}
+# Divide the tissues in 4 clusters
+pheatmap(TPM,
+         scale= "row",
+         show_rownames = FALSE,
+         cutree_cols = 4,
+         color=viridis(10),
+         main = "Heatmap of core promoters clustered by tissues usage, rows standardization")
+```
+
+The hierarchical clustering on the heatmap shows that we have 4 types of tissue expression patterns, that uses different core promoters. 
+
+The expression patterns are:  
+
+* Liver tissue  
+* Embryonic and lungs tissues  
+* Blood macrophages tissue  
+* Cerebellum, somatosensory cortex and visual cortex tissues  
+
+### From an other perspective we could try to find optimal promoters clusters, by dividing the core promoters
+
+```{r}
+# Find optimal promoters clusters 
+dist.matrix <- dist(TPM)
+htree <- hclust(dist.matrix)
+plot(htree)
+rect.hclust(htree, k=6, border="red")
+```
+
+From hierarchical tree division, it seems that we have 6 clusters of core promoters.
+
+### Heatmap of the different types of core promoters, divided by tissues expression pattern
+
+```{r}
+# Heatmap of the different types of core promoters
+pheatmap(TPM,
+         scale= "row",
+         show_rownames = FALSE,
+         cutree_rows = 6,
+         cutree_cols = 4,
+         color=viridis(10),
+         main = "Heatmap of core promoters, clustered by core promoters types and tissues")
+```
+
+We have 6 clusters of core promoters based on their usage from the 4 clusters of tissues.
+
+__2. What tissues are similar to each other in terms of promoter usage? They would really like to have this as a picture and not just "values"__
+
+### PCA plot
+
+```{r}
+# Convert tissues' TPM to matrix and transpose
+pca_cage_matrix <- TPM %>% as.matrix %>% t
+
+# Singular value decomposition
+pca_cage <- prcomp(pca_cage_matrix, center=TRUE)
+
+# Extract % variance
+percent_variance <- summary(pca_cage)$importance["Proportion of Variance",] * 100
+
+# Create a vector for the tissues clusters color
+tissues_clusters <- as.factor(c(1, 2, 3, 2, 4, 1, 1))
+
+# PCA plot
+as_tibble(pca_cage$x) %>% 
+  ggplot(aes(x=PC1, y=PC2, label=tissues, col=tissues_clusters)) + 
+  geom_point() + 
+  geom_text() + 
+  xlab(label = paste("PC1", percent_variance[1], "%")) +
+  ylab(label = paste("PC2", percent_variance[2], "%")) + 
+  labs(title = "PCA plot of tissues usage of core promoters") + 
+  theme_bw()
+```
+
+We can see the differences between the core promoters usage of the tissues by both, the heatmaps shown in the previous exercise and in the above PCA plot. Overall, we can confirm that we have the 4 mentioned different tissues patterns, in terms of core promoters usage.
+
+__3.  How many tissue-specific promoters are there, per tissue and just allover? It would be very helpful to calculate two "specificity scores": one for each tissue, and one summary score across all tissues for each promoter. __ 
+
+__4. They want to have  genome browser examples of the most tissue-specific promoter for each tissue__
+
+
+__5 Lastly, they want a list with the 10 most tissue-specific promoters, taking all tissues into account.__
+
+### Use of variance and Gini coefficient to find the tissue-specific promoters
+
+```{r}
+library(reldist)
+
+# Find most specific promoter using using variance
+cage_data %>% 
+  mutate(variance=apply(cage_data[tissues], 1, var)) %>% 
+  arrange(desc(variance)) %>% 
+  head(10)
+
+# Find most specific promoter using gini index
+cage_data %>% 
+  mutate(gini=apply(cage_data[tissues], 1, reldist::gini)) %>% 
+  arrange(desc(gini)) %>% 
+  head(10) 
+```
+
+The variance, since it is a measure of the spread of a distribution, it could be used to measure the promoter specificity across all tissues, but the Gini coefficient should be a more specific metric for this task. The Gini coefficient is a common measure of inequality within a distribution. It goes from 0 and 1, where 0 is the complete equality and 1 is the complete inequality. It can be used to compute the tissue specificity.
