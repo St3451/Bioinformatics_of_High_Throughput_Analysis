@@ -1,6 +1,6 @@
 # Bioinformatics of High-Throughput Analysis
 
-This repository contains the assignments of BOHTA course (fourth block of courses of my MSc in Bioinformatics). 
+This repository contains the assignments of [BOHTA](https://kurser.ku.dk/course/NBIA07023U) course (fourth block of courses of my MSc in Bioinformatics). 
 
 ## Assigments
 
